@@ -4,7 +4,7 @@ function initialize() {
     cat <<EOF
 
 Cash Register v0.1
-
+ 
 EOF
 }
 
@@ -28,15 +28,15 @@ EOF
 }
 
 function list_description() {
-    echo todo
+    awk 'BEGIN{ print "Code     Price  Description" }; { printf "%s%10s  %s\n", $1, $2, $3 }' FS='\t' items.dat | (sed -u 1q; sort -k 3) | less
 }
 
 function list_number() {
-    echo todo
+    awk 'BEGIN{ print "Code     Price  Description" }; { printf "%s%10s  %s\n", $1, $2, $3 }' FS='\t' items.dat | (sed -u 1q; sort -k 1) | less
 }
 
 function list_price() {
-    echo todo
+    awk 'BEGIN{ print "Code     Price  Description" }; { printf "%s%10s  %s\n", $1, $2, $3 }' FS='\t' items.dat | (sed -u 1q; sort -k 2 -g) | less
 }
 
 function show_cart() {
@@ -57,49 +57,42 @@ function finalize_transaction() {
 
 function main() {
     initialize
-
+    
     read -p 'Selection (h for help)? ' selection
-
+    
     while [ $selection != q ]
     do
 	case $selection in
 	    h)
 		show_help
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    d)
 		list_description
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    i)
 		list_number
-		read -p 'Selection (h for help)? ' selection
-		;;
+	       	;;
 	    p)
 		list_price
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    s)
 		show_cart
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    t)
 		show_total
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    a)
 		abort_transaction
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    f)
 		finalize_transaction
-		read -p 'Selection (h for help)? ' selection
 		;;
 	    q)
 		exit 0
 		;;
 	esac
-    done
+	read -p 'Selection (h for help)? ' selection
+    done  
 }
 
 main
