@@ -176,6 +176,11 @@ function generate_receipt() {
   # Create and display PDF
   pdflatex receipt < /dev/null &> /dev/null
   evince receipt.pdf &> /dev/null
+
+  if [ "$?" -eq 0 ];
+  then
+    rm .cart
+  fi
 }
 
 function add_cart() {
