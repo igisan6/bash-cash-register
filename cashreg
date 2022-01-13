@@ -45,7 +45,7 @@ function list_price() {
 function show_cart() {
     echo
     if [ ! -s .cart ]; then
-	printf "\nEmpty.\n\n"
+	printf "Empty.\n"
     else
 	awk '
 	    BEGIN{ print "Quantity    Code     Price  Description" };
@@ -79,6 +79,7 @@ function abort_transaction() {
 	fi
 	read -p 'Abort transaction (Yes/No)? ' selection
     done
+    echo
 }
 
 function finalize_transaction() {
