@@ -64,8 +64,14 @@ function show_cart() {
 # Calculate the total from the cart
 function get_total() {
     # Calculate total by multiplying quantity and price
-    local result=$(awk '{ total+=($1*$3) } END { print total }' .cart)
-    echo $result
+    if [ -f .cart ];
+    then
+      local result=$(awk '{ total+=($1*$3) } END { print total }' .cart)
+      echo $result
+    else
+      result="0.00"
+      echo $result
+    fi
 }
 
 # Display the total from the cart
@@ -98,8 +104,17 @@ function finalize_transaction() {
     total=$(echo $(get_total) | cut -d':' -f2)
     printf "\n"
 
+    if [ $(echo "$total < 0" | bc) == 1 ];
+    then
+	    printf "Change: $total\n\n"
+	    printf "Generating PDF...\n"
+	    printf "Displaying PDF...\n\n"
+	    generate_receipt
+      return 0
+    fi
+
     # If the cart is empty, or the total is 0, print the correct change
-    if [ ! -s .cart ] || [ $(echo "$total == 0" | bc) == 1 ];
+    if [ $(echo "$total == 0" | bc) == 1 ];
     then
         echo -e "Change: 0.00\n"
         return 0
@@ -114,14 +129,6 @@ function finalize_transaction() {
         return 0
     fi
 
-    if [ $(echo "$total < 0" | bc) == 1 ];
-    then
-	printf "\nChange: $total\n\n"
-	printf "Generating PDF...\n"
-	printf "Displaying PDF...\n\n"
-	generate_receipt
-    fi
-    
     # If overpaid, calculate the change and generate the receipt
     if [ $(echo "$payment > $total" | bc) == 1 ];
     then
@@ -136,6 +143,12 @@ function finalize_transaction() {
       do
         total=$(echo "$total - $payment" | bc)
         read -p "Enter payment ($total remaining, blank to abort): " payment
+
+        if [[ $payment = "" ]];
+        then
+            echo
+            return 0
+        fi
       done
 
       # If overpaid, calculate the change and generate the receipt
