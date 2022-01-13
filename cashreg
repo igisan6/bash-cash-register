@@ -4,7 +4,7 @@ function initialize() {
     cat <<EOF
 
 Cash Register v0.1
- 
+
 EOF
 }
 
@@ -83,67 +83,70 @@ function abort_transaction() {
 }
 
 function finalize_transaction() {
-    # If cart is empty (or total = 0)
-    if [ ! -s .cart ];
-    then
-	echo -e "\nChange: 0.00\n"
-	return 1
-    fi
-    
     total=$(echo $(get_total) | cut -d':' -f2)
+    printf "\n"
+
+    if [ ! -s .cart ] || [ $(echo "$total == 0" | bc) == 1 ];
+    then
+        echo -e "Change: 0.00\n"
+        return 0
+    fi
+
     read -p "Enter payment ($total remaining, blank to abort): " payment
 
-    # If input is empty, abort finalize
+    # If payment is empty, exit program
     if [[ $payment = "" ]];
     then
-	echo
-	return 0
+        echo
+        return 0
     fi
 
-    total=$(echo "$total - $payment" | bc -l)
-    
-    # If overpaid, print change
-    if [ $(echo "$total < 0" | bc -l) ];
+    if [ $(echo "$payment > $total" | bc) == 1 ];
     then
-	echo -e "\nChange: $total\n"
-
-    # If underpaid, keep looping
+      total=$(echo "$payment - $total" | bc)
+      printf "\nChange: $total\n\n"
+      printf "Generating PDF...\n"
+      printf "Displaying PDF...\n\n"
+      generate_receipt
     else
-	read -p "Enter payment ($total remaining, blank to abort): " payment
-	total=$(echo "$total - $payment" | bc -l)
-	while [ $(echo "$total > 0" | bc -l) ]
-	do
-	    read -p "Enter payment ($total remaining, blank to abort): " payment
-	    total=$(echo "$total - $payment" | bc -l)
-	done
+      while [ $(echo "$total - $payment > 0" | bc) == 1 ];
+      do
+        total=$(echo "$total - $payment" | bc)
+        read -p "Enter payment ($total remaining, blank to abort): " payment
+      done
 
-	if [ $(echo "$total == 0" | bc -l) ];
-	then
-	    echo -e "\nChange: 0.00\n"
-	elif [ $(echo "$total < 0" | bc -l) ];
-	then
-	    echo -e "\nChange: $total\n"
-	fi    
+      if [ $(echo "$payment > $total" | bc) == 1 ];
+      then
+        total=$(echo "$payment - $total" | bc)
+        printf "\nChange: $total\n\n"
+        printf "Generating PDF...\n"
+        printf "Displaying PDF...\n\n"
+        generate_receipt
+      elif [ $(echo "$payment == $total" | bc) == 1 ];
+      then
+        printf "\nChange: 0.00\n\n"
+        printf "Generating PDF...\n"
+        printf "Displaying PDF...\n\n"
+        generate_receipt
+      fi
     fi
+}
 
-    # > 0
-    : '
-    while [ $(echo "$total > 0" | bc -l) ]
-    do
-	if [ $(echo "$total < 0" | bc -l) ];
-	    change=$result
-	    echo "Change: $change"
-	    return 1
-	else
-	    read -p "Enter payment ($total remaining, blank to abort): " payment
-	    total=$(echo "$total - $payment" | bc -l)
-	fi
-    done
-    
-    echo $total
+function generate_receipt() {
+  awk -F '\t' '
+  {array[$2] += $1}
+  {array2[$2] = $3}
+  {array3[$2] = $4}
+  END {
+    for (i in array)
+      printf "%s,%s,%s,%s\n", i, array3[i], array[i], array2[i]}
+  ' .cart > .receipt
 
-    # result=$(bc -l <<<"${total}-${payment}")
-    '
+  awk -F',' '$3 != 0' .receipt > temp && mv temp .receipt
+  sort -k1 -n -o .receipt{,}
+
+  pdflatex receipt < /dev/null > /dev/null
+  evince receipt.pdf
 }
 
 function add_cart() {
@@ -165,9 +168,9 @@ function add_cart() {
 
 function main() {
     initialize
-    
+
     read -p 'Selection (h for help)? ' selection
-    
+
     while [ "$selection" != q ]
     do
 	case "$selection" in
@@ -183,7 +186,7 @@ function main() {
 	    [-0-9]*) add_cart $selection ;;
 	esac
 	read -p 'Selection (h for help)? ' selection
-    done  
+    done
 }
 
 main "$@"
