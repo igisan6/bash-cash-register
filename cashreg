@@ -1,6 +1,7 @@
 #!/bin/bash
 
-function initialize() {
+# Display Cash Register version
+function display_version() {
     cat <<EOF
 
 Cash Register v0.1
@@ -8,6 +9,7 @@ Cash Register v0.1
 EOF
 }
 
+# Display help menu
 function show_help() {
     cat<<EOF
 
@@ -27,21 +29,25 @@ Other
 EOF
 }
 
+# Sort items.dat by description
 function list_description() {
     awk 'BEGIN{ print "Code     Price  Description" }; { printf "%s%10s  %s\n",\
     $1, $2, $3 }' FS='\t' items.dat | (sed -u 1q; sort -k 3) | less
 }
 
+# Sort items.dat by item number
 function list_number() {
     awk 'BEGIN{ print "Code     Price  Description" }; { printf "%s%10s  %s\n",\
     $1, $2, $3 }' FS='\t' items.dat | (sed -u 1q; sort -k 1) | less
 }
 
+# Sort items.dat by price
 function list_price() {
     awk 'BEGIN{ print "Code     Price  Description" }; { printf "%s%10s  %s\n",\
     $1, $2, $3 }' FS='\t' items.dat | (sed -u 1q; sort -k 2 -g) | less
 }
 
+# Display the contents of the cart
 function show_cart() {
     echo
     if [ ! -s .cart ]; then
@@ -55,22 +61,27 @@ function show_cart() {
     echo
 }
 
+# Calculate the total from the cart
 function get_total() {
+    # Calculate total by multiplying quantity and price
     local result=$(awk '{ total+=($1*$3) } END { print total }' .cart)
     echo $result
 }
 
+# Display the total from the cart
 function show_total() {
     result=$(get_total)
     printf "\nTotal: %s\n\n" "$result"
 }
 
+# Abort transaction if input is Yes or No
 function abort_transaction() {
     echo
     read -p 'Abort transaction (Yes/No)? ' selection
 
     while [ "$selection" != "No" ]
     do
+      # Clear the cart and return to the menu loop
 	if [ "$selection" = "Yes" ];
 	then
 	    > .cart
@@ -82,10 +93,12 @@ function abort_transaction() {
     echo
 }
 
+# Prompt user for payment
 function finalize_transaction() {
     total=$(echo $(get_total) | cut -d':' -f2)
     printf "\n"
 
+    # If the cart is empty, or the total is 0, print the correct change
     if [ ! -s .cart ] || [ $(echo "$total == 0" | bc) == 1 ];
     then
         echo -e "Change: 0.00\n"
@@ -94,13 +107,22 @@ function finalize_transaction() {
 
     read -p "Enter payment ($total remaining, blank to abort): " payment
 
-    # If payment is empty, exit program
+    # If the input is blank, abort the function
     if [[ $payment = "" ]];
     then
         echo
         return 0
     fi
 
+    if [ $(echo "$total < 0" | bc) == 1 ];
+    then
+	printf "\nChange: $total\n\n"
+	printf "Generating PDF...\n"
+	printf "Displaying PDF...\n\n"
+	generate_receipt
+    fi
+    
+    # If overpaid, calculate the change and generate the receipt
     if [ $(echo "$payment > $total" | bc) == 1 ];
     then
       total=$(echo "$payment - $total" | bc)
@@ -109,12 +131,14 @@ function finalize_transaction() {
       printf "Displaying PDF...\n\n"
       generate_receipt
     else
+      # If payment is not enough, keep prompting for payment
       while [ $(echo "$total - $payment > 0" | bc) == 1 ];
       do
         total=$(echo "$total - $payment" | bc)
         read -p "Enter payment ($total remaining, blank to abort): " payment
       done
 
+      # If overpaid, calculate the change and generate the receipt
       if [ $(echo "$payment > $total" | bc) == 1 ];
       then
         total=$(echo "$payment - $total" | bc)
@@ -122,6 +146,7 @@ function finalize_transaction() {
         printf "Generating PDF...\n"
         printf "Displaying PDF...\n\n"
         generate_receipt
+      # If payment is exact, print 0 for change and generate the receipt
       elif [ $(echo "$payment == $total" | bc) == 1 ];
       then
         printf "\nChange: 0.00\n\n"
@@ -132,23 +157,35 @@ function finalize_transaction() {
     fi
 }
 
+# Generate receipt based on items in cart
 function generate_receipt() {
+  # Use associative arrays to store the item attributes
   awk -F '\t' '
-  {array[$2] += $1}
-  {array2[$2] = $3}
-  {array3[$2] = $4}
+  {
+    # Item Number : Quantity
+    array[$2] += $1
+    # Item Number : Price
+    array2[$2] = $3
+    # Item Number : Description
+    array3[$2] = $4
+  }
+
   END {
     for (i in array)
-      printf "%s,%s,%s,%s\n", i, array3[i], array[i], array2[i]}
+      printf "%s,%s,%s,%s\n", i, array3[i], array[i], array2[i]
+  }
   ' .cart > .receipt
 
+  # Remove items with a count of 0 from receipt and sort by item number
   awk -F',' '$3 != 0' .receipt > temp && mv temp .receipt
   sort -k1 -n -o .receipt{,}
 
+  # Create and display PDF
   pdflatex receipt < /dev/null > /dev/null
   evince receipt.pdf
 }
 
+# Add items to cart based on item number and/or quantity
 function add_cart() {
     if [ "$#" -eq 1 ];
     then
@@ -166,8 +203,9 @@ function add_cart() {
     fi
 }
 
+# Prompt user for input and call functions based on input
 function main() {
-    initialize
+    display_version
 
     read -p 'Selection (h for help)? ' selection
 
