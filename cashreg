@@ -83,12 +83,67 @@ function abort_transaction() {
 }
 
 function finalize_transaction() {
-    total=$(echo $(get_total) | cut -d':' -f2)
+    # If cart is empty (or total = 0)
+    if [ ! -s .cart ];
+    then
+	echo -e "\nChange: 0.00\n"
+	return 1
+    fi
     
+    total=$(echo $(get_total) | cut -d':' -f2)
     read -p "Enter payment ($total remaining, blank to abort): " payment
 
-    result=$(bc -l <<<"${total}-${payment}")
-    echo $result
+    # If input is empty, abort finalize
+    if [[ $payment = "" ]];
+    then
+	echo
+	return 0
+    fi
+
+    total=$(echo "$total - $payment" | bc -l)
+    
+    # If overpaid, print change
+    if [ $(echo "$total < 0" | bc -l) ];
+    then
+	echo -e "\nChange: $total\n"
+
+    # If underpaid, keep looping
+    else
+	read -p "Enter payment ($total remaining, blank to abort): " payment
+	total=$(echo "$total - $payment" | bc -l)
+	while [ $(echo "$total > 0" | bc -l) ]
+	do
+	    read -p "Enter payment ($total remaining, blank to abort): " payment
+	    total=$(echo "$total - $payment" | bc -l)
+	done
+
+	if [ $(echo "$total == 0" | bc -l) ];
+	then
+	    echo -e "\nChange: 0.00\n"
+	elif [ $(echo "$total < 0" | bc -l) ];
+	then
+	    echo -e "\nChange: $total\n"
+	fi    
+    fi
+
+    # > 0
+    : '
+    while [ $(echo "$total > 0" | bc -l) ]
+    do
+	if [ $(echo "$total < 0" | bc -l) ];
+	    change=$result
+	    echo "Change: $change"
+	    return 1
+	else
+	    read -p "Enter payment ($total remaining, blank to abort): " payment
+	    total=$(echo "$total - $payment" | bc -l)
+	fi
+    done
+    
+    echo $total
+
+    # result=$(bc -l <<<"${total}-${payment}")
+    '
 }
 
 function add_cart() {
