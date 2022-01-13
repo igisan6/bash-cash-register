@@ -94,6 +94,7 @@ function finalize_transaction() {
 
     if [ $(echo "$total < 0" | bc) == 1 ];
     then
+      total=$(echo "$total * -1" | bc)
 	    printf "Change: $total\n\nGenerating PDF...\nDisplaying PDF...\n\n"
 	    generate_receipt
       return 0
@@ -173,8 +174,8 @@ function generate_receipt() {
   sort -k1 -n -o .receipt{,}
 
   # Create and display PDF
-  pdflatex receipt < /dev/null > /dev/null
-  evince receipt.pdf
+  pdflatex receipt < /dev/null &> /dev/null
+  evince receipt.pdf &> /dev/null
 }
 
 function add_cart() {
